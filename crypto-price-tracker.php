@@ -16,7 +16,7 @@ class CryptoPlugin
     public function __construct()
     {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
-        add_shortcode('my_vue_app', array($this, 'render_vue_app'));
+        add_shortcode('crypto_app', array($this, 'render_vue_app'));
     }
 
     public function enqueue_scripts()

@@ -3,7 +3,7 @@ import CryptoTracker from './components/CryptoTracker.vue'
 </script>
 
 <template>
-  <CryptoTracker is-selector :refresh-interval="70" />
+  <CryptoTracker is-selector />
 </template>
 
 <style scoped></style>

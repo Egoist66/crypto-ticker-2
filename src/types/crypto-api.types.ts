@@ -1,6 +1,6 @@
-export interface CryptoResponse {
+export interface CryptoResponse<T> {
   success: boolean
-  data: Data
+  data: T
 }
 
 export interface Data {
@@ -11,4 +11,6 @@ export interface Data {
   priceChange: number
   priceChangePercent: number
   lastUpdated: string
+  icon: string
+  fullName: string
 }

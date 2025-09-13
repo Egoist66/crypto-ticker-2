@@ -1,140 +1,147 @@
 import type { Coins, Props } from '@/types/crypto.types'
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
+import cryptoConfig from '../config/api.config.json'
+import type { CryptoResponse, Data } from '@/types/crypto-api.types'
+import { useQuery } from '@tanstack/vue-query'
 
-import cryptoData from '../config/api.config.json'
-import type { CryptoResponse } from '@/types/crypto-api.types'
-
-export const useCryptoTracker = ({ coin, showChange, showIcon, currency, isSelector }: Props) => {
-  const refreshIntervalValue = ref<number>(70)
+export const useCryptoTracker = ({
+  coin,
+  showChange,
+  showIcon,
+  refreshInterval,
+  currency,
+  isSelector,
+}: Props) => {
   const selectedCoin = ref<Coins>(coin || 'bitcoin')
-  const price = ref<number>(0)
-  const change = ref<number>(0)
-  const isLoading = ref<boolean>(true)
-  const error = ref<string | null>(null)
   const lastUpdated = ref<Date | null>(null)
-  const refreshIntervalId = ref<number | null>(null)
+  const isAllReportVisible = ref<boolean>(false)
 
-  const coinName = computed(() => {
-    const names: Record<string, string> = {
-      bitcoin: 'Bitcoin (BTC)',
-      ethereum: 'Ethereum (ETH)',
-      solana: 'Solana (SOL)',
+  const toggleAllReport = () => {
+    isAllReportVisible.value = !isAllReportVisible.value
+  }
+
+  const fetchPrice = async (): Promise<CryptoResponse<Data>> => {
+    const response = await fetch(`${cryptoConfig.currentCryptoUrl}${selectedCoin.value}`, {
+      headers: {
+        'X-WP-Nonce': cryptoConfig.nonce,
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok')
     }
-    return names[selectedCoin.value!] || 'Crypto'
+
+    lastUpdated.value = new Date()
+    return response.json()
+  }
+
+  const fetchAllCryptosPrice = async (): Promise<CryptoResponse<Data[]>> => {
+    const response = await fetch(`${cryptoConfig.allCryptosUrl}`, {
+      headers: {
+        'X-WP-Nonce': cryptoConfig.nonce,
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok')
+    }
+
+    lastUpdated.value = new Date()
+    return response.json()
+  }
+
+  const {
+    isPending,
+    isError,
+    isLoading,
+    isRefetching,
+    dataUpdatedAt,
+    status,
+    data,
+    error,
+    refetch,
+  } = useQuery<CryptoResponse<Data>>({
+    queryKey: ['cryptos', selectedCoin.value],
+    networkMode: 'online',
+    retry: 3,
+    refetchOnMount: true,
+    refetchInterval: refreshInterval! * 1000,
+    queryFn: fetchPrice,
+  })
+
+  const { data: allReportData, refetch: refetchAllCryptos } = useQuery<CryptoResponse<Data[]>>({
+    queryKey: ['all-cryptos'],
+    networkMode: 'online',
+    retry: 3,
+    refetchIntervalInBackground: true,
+    refetchOnMount: true,
+    refetchInterval: refreshInterval! * 1000,
+    queryFn: fetchAllCryptosPrice,
   })
 
   const formattedPrice = computed(() => {
-    if (!price.value) return 'Loading...'
+    if (!data.value?.data.price) return 'Loading...'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(price.value)
+    }).format(data.value?.data.price)
   })
 
   const formattedChange = computed(() => {
-    return change.value ? `${change.value > 0 ? '+' : ''}${change.value.toFixed(2)}%` : '0%'
+    return data.value?.data.priceChange
+      ? `${data.value?.data.priceChange > 0 ? '+' : ''}${data.value?.data.priceChange.toFixed(2)}%`
+      : '0%'
   })
 
   const changeClass = computed(() => ({
-    'change-positive': change.value > 0,
-    'change-negative': change.value < 0,
-    'change-neutral': change.value === 0,
+    'change-positive': data.value?.data?.priceChange ? data.value.data.priceChange > 0 : false,
+    'change-negative': data.value?.data?.priceChange ? data.value.data.priceChange < 0 : false,
+    'change-neutral': data.value?.data?.priceChange ? data.value.data.priceChange === 0 : false,
   }))
 
   const formattedTime = computed(() => {
-    return lastUpdated.value ? `Updated: ${lastUpdated.value.toLocaleTimeString()}` : ''
-  })
-
-  const coinIcon = computed(() => {
-    const icons: Record<string, string> = {
-      bitcoin: 'https://img.icons8.com/color/48/bitcoin',
-      ethereum: 'https://img.icons8.com/3d-fluency/94/ethereum.png',
-      solana: 'https://img.icons8.com/nolan/64/solana.png',
-    }
-    return icons[selectedCoin.value!] || 'https://img.icons8.com/3d-fluency/94/coin.png'
-  })
-
-  const fetchPrice = async (coin: string) => {
-    try {
-      isLoading.value = true
-      error.value = null
-
-      const response = await fetch(`${cryptoData.baseURL}${coin}`, {
-        headers: {
-          'X-WP-Nonce': cryptoData.nonce,
-          Accept: 'application/json',
-        },
-      })
-
-      const data: CryptoResponse = await response.json()
-
-      if (data.success) {
-        price.value = data.data.price
-        change.value = data.data.priceChange
-        lastUpdated.value = new Date()
-      } else {
-        error.value = 'Failed to fetch data'
-      }
-    } catch (err) {
-      error.value = 'Network error'
-      console.error('Error fetching crypto price:', err)
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const startAutoRefresh = (interval: number = 70) => {
-    stopAutoRefresh()
-
-    if (refreshIntervalValue.value! > 0) {
-      refreshIntervalId.value = window.setInterval(async () => {
-        await fetchPrice(selectedCoin.value)
-      }, interval * 1000)
-    }
-  }
-
-  const stopAutoRefresh = () => {
-    if (refreshIntervalId.value !== null) {
-      clearInterval(refreshIntervalId.value)
-      refreshIntervalId.value = null
-    }
-  }
-
-  onMounted(async () => {
-    await fetchPrice(selectedCoin.value)
-    startAutoRefresh()
-  })
-
-  onUnmounted(() => {
-    stopAutoRefresh()
+    return dataUpdatedAt.value
+      ? `Updated: ${new Date(dataUpdatedAt.value).toLocaleTimeString()}`
+      : ''
   })
 
   watch(selectedCoin, async () => {
-    stopAutoRefresh()
-    await fetchPrice(selectedCoin.value)
+    refetch()
   })
 
-  watch(refreshIntervalValue, () => {
-    stopAutoRefresh()
-    startAutoRefresh(refreshIntervalValue.value)
+  watch(isAllReportVisible, () => {
+    refetchAllCryptos()
+  })
+
+  onUnmounted(() => {
+    refetch({ cancelRefetch: true })
   })
 
   return {
-    coinName,
+    fetchPrice,
+    refetch,
+    toggleAllReport,
     formattedPrice,
     formattedChange,
     changeClass,
     formattedTime,
-    coinIcon,
-    isLoading,
-    error,
     selectedCoin,
     showChange,
     showIcon,
-    fetchPrice,
-    refreshIntervalValue,
     isSelector,
+    data,
+    error,
+    isError,
+    isLoading,
+    isRefetching,
+    isPending,
+    dataUpdatedAt,
+    status,
+    isAllReportVisible,
+    allReportData,
   }
 }

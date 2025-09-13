@@ -1,4 +1,5 @@
 {
-  "baseURL": "https://crypto-api-app-production.up.railway.app/price/",
+  "currentCryptoUrl": "https://crypto-api-app-production.up.railway.app/price/",
+  "allCryptosUrl": "https://crypto-api-app-production.up.railway.app/cryptos",
   "nonce": "e9d4e3b8b1"
 }

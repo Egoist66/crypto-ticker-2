@@ -4,7 +4,7 @@ import type { Props } from '@/types/crypto.types'
 
 const {
   showChange = true,
-  refreshInterval = 3,
+  refreshInterval = 60,
   showIcon = true,
   currency = 'USD',
   isSelector = false,
@@ -12,15 +12,19 @@ const {
 
 const {
   changeClass,
-  coinIcon,
-  coinName,
   error,
   formattedPrice,
   formattedChange,
   formattedTime,
+  isPending,
   isLoading,
+  isRefetching,
   selectedCoin,
-  refreshIntervalValue,
+  data,
+  isAllReportVisible,
+  allReportData,
+  toggleAllReport,
+  refetch,
 } = useCryptoTracker({
   showChange,
   refreshInterval,
@@ -30,9 +34,8 @@ const {
 </script>
 
 <template>
-  <div class="crypto-price-container" :class="{ loading: isLoading, error: !!error }">
-    <!-- Селектор криптовалют -->
-    <div v-if="isSelector" class="crypto-selector">
+  <div class="crypto-price-container" :class="{ loading: isPending, error: !!error }">
+    <div v-if="isSelector && !isAllReportVisible" class="crypto-selector">
       <label for="crypto-select">Выберите криптовалюту:</label>
       <select id="crypto-select" v-model="selectedCoin">
         <option value="bitcoin">Bitcoin (BTC)</option>
@@ -41,39 +44,63 @@ const {
       </select>
     </div>
 
-    <div v-if="refreshInterval" class="crypto-refresh crypto-selector">
-      <label for="crypto-refresh-select">Обновлять каждые:</label>
-      <select class="select" id="crypto-refresh-select" v-model="refreshIntervalValue">
-        <option value="1">1 секунду</option>
-        <option value="5">5 секунд</option>
-        <option value="10">10 секунд</option>
-        <option value="70">70 секунд</option>
-      </select>
-
+    <div class="crypto-refresh crypto-selector">
       <div v-if="isLoading" class="crypto-loading">
-        <p>Загрузка данных для {{ coinName }}...</p>
+        <p>Загрузка данных для {{ data?.data.fullName }}...</p>
       </div>
 
-      <!-- Состояние ошибки -->
-      <div v-if="error && !isLoading" class="crypto-error">
+      <div v-if="error && !isPending" class="crypto-error">
         <p>Ошибка: {{ error }}</p>
       </div>
 
-      <!-- Отображение данных -->
-      <div v-if="!isLoading && !error" class="crypto-content">
-        <div v-if="showIcon" class="crypto-icon">
-          <img :src="coinIcon" :alt="selectedCoin" width="32" height="32" />
+      <div class="crypto-content-wrapper">
+        <div v-if="!isLoading && !error && !isAllReportVisible" class="crypto-content">
+          <div v-if="showIcon" class="crypto-icon">
+            <img :src="data?.data.icon" :alt="selectedCoin" width="32" height="32" />
+          </div>
+
+          <div class="crypto-info">
+            <h3 class="crypto-name">{{ data?.data.fullName }}</h3>
+            <p class="crypto-price">{{ formattedPrice }}</p>
+
+            <p v-if="showChange" class="crypto-change" :class="changeClass">
+              {{ formattedChange }}
+            </p>
+
+            <small class="crypto-updated">
+              <b v-if="isRefetching">{{ formattedTime }}</b>
+              <template v-else>{{ formattedTime }}</template>
+            </small>
+          </div>
         </div>
 
-        <div class="crypto-info">
-          <h3 class="crypto-name">{{ coinName }}</h3>
-          <p class="crypto-price">{{ formattedPrice }}</p>
+        <div v-if="!isLoading && !error">
+          <div v-if="!isAllReportVisible" class="refresh-btn-wrapper">
+            <button @click="refetch()">Обновить данные</button>
+          </div>
 
-          <p v-if="showChange" class="crypto-change" :class="changeClass">
-            {{ formattedChange }}
-          </p>
+          <div class="show-all-btn-wrapper">
+            <button @click="toggleAllReport">
+              {{ isAllReportVisible ? 'Скрыть' : 'Показать' }} данные всех
+            </button>
+          </div>
 
-          <small class="crypto-updated">{{ formattedTime }}</small>
+          <div class="all-cryptos-wrapper" v-if="allReportData?.data.length && isAllReportVisible">
+            <div v-for="crypto in allReportData.data" :key="crypto.id">
+              <div class="crypto-icon">
+                <img :src="crypto.icon" :alt="crypto.fullName" width="32" height="32" />
+              </div>
+
+              <div class="crypto-info">
+                <h3 class="crypto-name">{{ crypto.fullName }}</h3>
+                <p class="crypto-price">${{ crypto.price }}</p>
+
+                <p v-if="showChange" class="crypto-change" :class="changeClass">
+                  {{ crypto.priceChange }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -81,6 +108,34 @@ const {
 </template>
 
 <style scoped>
+.all-cryptos-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 50px;
+  padding-top: 50px;
+}
+.refresh-btn-wrapper {
+  padding-bottom: 20px;
+}
+button {
+  padding: 7px;
+  height: 40px;
+  border: none;
+  background-color: #405870;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  width: 170px;
+}
+
+button:hover {
+  background-color: #2c3e50;
+}
+.crypto-content-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .crypto-price-container {
   display: flex;
   flex-direction: column;

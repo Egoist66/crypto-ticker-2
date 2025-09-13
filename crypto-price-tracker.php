@@ -21,14 +21,14 @@ class CryptoPlugin
 
     public function enqueue_scripts()
     {
-        $app_js_path = plugin_dir_path(__FILE__) . 'dist/assets/index-DlK7tntA.js';
-        $css_path = plugin_dir_path(__FILE__) . 'dist/assets/index-CRccXoXh.css';
+        $app_js_path = plugin_dir_path(__FILE__) . 'dist/assets/index-CWjDBGuc.js';
+        $css_path = plugin_dir_path(__FILE__) . 'dist/assets/index-D1Q5-xB6.css';
 
 
         if (file_exists($app_js_path)) {
             wp_enqueue_script(
-                'my-vue-app',
-                plugin_dir_url(__FILE__) . 'dist/assets/index-DlK7tntA.js',
+                'crypto-app-script',
+                plugin_dir_url(__FILE__) . 'dist/assets/index-CWjDBGuc.js',
                 [],
                 filemtime($app_js_path),
                 true
@@ -37,8 +37,8 @@ class CryptoPlugin
 
         if (file_exists($css_path)) {
             wp_enqueue_style(
-                'my-vue-style',
-                plugin_dir_url(__FILE__) . 'dist/assets/index-CRccXoXh.css',
+                'crypto-app-style',
+                plugin_dir_url(__FILE__) . 'dist/assets/index-D1Q5-xB6.css',
                 array(),
                 filemtime($css_path)
             );
@@ -51,7 +51,7 @@ class CryptoPlugin
         // Атрибуты шорткода
         $atts = shortcode_atts(array(
             'title' => 'Crypto App',
-            'app_id' => 'my-vue-app-' . uniqid() 
+            'app_id' => 'crypto-app-' . uniqid() 
         ), $atts);
 
         ob_start();
@@ -65,4 +65,4 @@ class CryptoPlugin
     }
 }
 
-new MyVuePlugin();
+new CryptoPlugin();

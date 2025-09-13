@@ -85,13 +85,13 @@ export const useCryptoTracker = ({ coin, showChange, showIcon, currency, isSelec
     }
   }
 
-  const startAutoRefresh = () => {
+  const startAutoRefresh = (interval: number = 70) => {
     stopAutoRefresh()
 
     if (refreshIntervalValue.value! > 0) {
       refreshIntervalId.value = window.setInterval(async () => {
         await fetchPrice(selectedCoin.value)
-      }, refreshIntervalValue.value! * 1000)
+      }, interval * 1000)
     }
   }
 
@@ -114,6 +114,11 @@ export const useCryptoTracker = ({ coin, showChange, showIcon, currency, isSelec
   watch(selectedCoin, async () => {
     stopAutoRefresh()
     await fetchPrice(selectedCoin.value)
+  })
+
+  watch(refreshIntervalValue, () => {
+    stopAutoRefresh()
+    startAutoRefresh(refreshIntervalValue.value)
   })
 
   return {

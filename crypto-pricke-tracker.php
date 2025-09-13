@@ -1,137 +1,72 @@
 <?php
 /**
- * Plugin Name: Crypto Price Tracker
- * Description: Отслеживание цен криптовалют в реальном времени с использованием WordPress Interactivity API
+ * Plugin Name: Crypto-plugin
+ * Description: Плагин для отображения криптовалютных цен
  * Version: 1.0.0
- * Author: Your Name
+ * Author: Farid
  */
 
-// Безопасность
-if (! defined('ABSPATH')) {
+// Запрет прямого доступа
+if (!defined('ABSPATH')) {
     exit;
 }
 
-// Константы плагина
-define('CRYPTO_PRICE_TRACKER_VERSION', '1.0.0');
-define('CRYPTO_PRICE_TRACKER_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('CRYPTO_PRICE_TRACKER_PLUGIN_PATH', plugin_dir_path(__FILE__));
-define('CRYPTO_API_BASE_URL', 'https://crypto-api-app-production.up.railway.app/price/');
-
-class CryptoPriceTracker
+class MyVuePlugin
 {
 
     public function __construct()
     {
-        add_action('init', [$this, 'init']);
-        add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
-        add_shortcode('crypto_price', [$this, 'shortcode_handler']);
-        add_shortcode('crypto_selector', [$this, 'selector_shortcode_handler']);
-    }
-
-    public function init()
-    {
-        // Регистрируем блок, если используем Gutenberg
-        if (function_exists('register_block_type')) {
-            $asset_file = include CRYPTO_PRICE_TRACKER_PLUGIN_PATH . 'build/index.asset.php';
-
-            register_block_type(CRYPTO_PRICE_TRACKER_PLUGIN_PATH . 'build', [
-                'editor_script' => 'crypto-price-tracker-editor',
-                'view_script'   => 'crypto-price-tracker-view',
-                'style'         => 'crypto-price-tracker-style',
-            ]);
-        }
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_shortcode('my_vue_app', array($this, 'render_vue_app'));
     }
 
     public function enqueue_scripts()
     {
-        // Подключаем один скомпилированный JS файл как модуль
-        wp_enqueue_script(
-            'crypto-price-tracker',
-            CRYPTO_PRICE_TRACKER_PLUGIN_URL . 'build/crypto-price-tracker.js',
-            ['wp-interactivity'], // Зависимости
-            CRYPTO_PRICE_TRACKER_VERSION,
-            [
-                'in_footer' => true,
-                'strategy'  => 'module',
-            ]
-        );
+        $app_js_path = plugin_dir_path(__FILE__) . 'dist/assets/index-DlK7tntA.js';
+        $css_path = plugin_dir_path(__FILE__) . 'dist/assets/index-CRccXoXh.css';
 
-        // Подключаем скомпилированный CSS
-        wp_enqueue_style(
-            'crypto-price-tracker-style',
-            CRYPTO_PRICE_TRACKER_PLUGIN_URL . 'build/style.css',
-            [],
-            CRYPTO_PRICE_TRACKER_VERSION
-        );
 
-        // Локализация
-        wp_localize_script('crypto-price-tracker', 'cryptoPriceData', [
-            'apiUrl'         => rest_url('crypto-price-tracker/v1/price/'),
-            'nonce'          => wp_create_nonce('wp_rest'),
-            'availableCoins' => ['bitcoin', 'ethereum', 'solana'],
-        ]);
+        // Подключаем основной скрипт приложения
+        if (file_exists($app_js_path)) {
+            wp_enqueue_script(
+                'my-vue-app',
+                plugin_dir_url(__FILE__) . 'dist/assets/index-DlK7tntA.js',
+                [],
+                filemtime($app_js_path),
+                true
+            );
+        }
+
+        // Подключаем стили из билда
+        if (file_exists($css_path)) {
+            wp_enqueue_style(
+                'my-vue-style',
+                plugin_dir_url(__FILE__) . 'dist/assets/index-CRccXoXh.css',
+                array(),
+                filemtime($css_path)
+            );
+        }
+
     }
 
-    // ... остальные методы shortcode_handler, selector_shortcode_handler, get_crypto_price остаются без изменений ...
+    public function render_vue_app($atts)
+    {
+        // Атрибуты шорткода
+        $atts = shortcode_atts(array(
+            'title' => 'Crypto App',
+            'app_id' => 'my-vue-app-' . uniqid() // Уникальный ID для каждого экземпляра
+        ), $atts);
+
+        // Буферизация вывода
+        ob_start();
+        ?>
+<div id="<?php echo esc_attr($atts['app_id']); ?>" class="vue-app-container">
+    <h2 class="vue-app-title"><?php echo esc_html($atts['title']); ?></h2>
+
+</div>
+<?php
+        return ob_get_clean();
+    }
 }
 
-new CryptoPriceTracker();
-
-// REST API endpoints
-add_action('rest_api_init', function () {
-    register_rest_route('crypto-price-tracker/v1', '/price/(?P<coin>[a-zA-Z0-9]+)', [
-        'methods'             => 'GET',
-        'callback'            => 'crypto_price_tracker_api_handler',
-        'permission_callback' => '__return_true',
-        'args'                => [
-            'coin' => [
-                'validate_callback' => function ($param, $request, $key) {
-                    $available_coins = ['bitcoin', 'ethereum', 'solana'];
-                    return in_array(strtolower($param), $available_coins);
-                },
-            ],
-        ],
-    ]);
-});
-
-function crypto_price_tracker_api_handler($request)
-{
-    $coin    = strtolower($request->get_param('coin'));
-    $api_url = CRYPTO_API_BASE_URL . $coin;
-
-    $response = wp_remote_get($api_url, [
-        'timeout' => 10,
-        'headers' => [
-            'Accept' => 'application/json',
-        ],
-    ]);
-
-    if (is_wp_error($response)) {
-        return rest_ensure_response([
-            'success' => false,
-            'error'   => $response->get_error_message(),
-            'data'    => null,
-        ]);
-    }
-
-    $status_code = wp_remote_retrieve_response_code($response);
-    $body        = wp_remote_retrieve_body($response);
-    $data        = json_decode($body, true);
-
-    if ($status_code !== 200 || ! $data) {
-        return rest_ensure_response([
-            'success' => false,
-            'error'   => 'Не удалось получить данные от API',
-            'data'    => null,
-        ]);
-    }
-
-    return rest_ensure_response([
-        'success' => true,
-        'data'    => [
-            'price'     => floatval($data['price'] ?? 0),
-            'change'    => floatval($data['change'] ?? 0),
-            'timestamp' => time(),
-        ],
-    ]);
-}
+new MyVuePlugin();

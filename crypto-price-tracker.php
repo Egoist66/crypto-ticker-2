@@ -6,12 +6,11 @@
  * Author: Farid
  */
 
-// Запрет прямого доступа
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class MyVuePlugin
+class CryptoPlugin
 {
 
     public function __construct()
@@ -26,7 +25,6 @@ class MyVuePlugin
         $css_path = plugin_dir_path(__FILE__) . 'dist/assets/index-CRccXoXh.css';
 
 
-        // Подключаем основной скрипт приложения
         if (file_exists($app_js_path)) {
             wp_enqueue_script(
                 'my-vue-app',
@@ -37,7 +35,6 @@ class MyVuePlugin
             );
         }
 
-        // Подключаем стили из билда
         if (file_exists($css_path)) {
             wp_enqueue_style(
                 'my-vue-style',
@@ -54,10 +51,9 @@ class MyVuePlugin
         // Атрибуты шорткода
         $atts = shortcode_atts(array(
             'title' => 'Crypto App',
-            'app_id' => 'my-vue-app-' . uniqid() // Уникальный ID для каждого экземпляра
+            'app_id' => 'my-vue-app-' . uniqid() 
         ), $atts);
 
-        // Буферизация вывода
         ob_start();
         ?>
 <div id="<?php echo esc_attr($atts['app_id']); ?>" class="vue-app-container">
